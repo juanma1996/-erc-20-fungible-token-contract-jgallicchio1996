@@ -1,7 +1,6 @@
 const { ethers } = require("hardhat");
 
 // Contract to deploy
-const CONTRACT_NAME = "ERC20";
 const contractPath = "contracts/ERC20.sol:ERC20";
 
 async function main() {
@@ -12,14 +11,17 @@ async function main() {
 
     // Get Signer
     const [signer] = await ethers.getSigners();
+
+    const name = "MyERC-20_Token";
+    const symbol = "PCIB";
+    const maxSupply = ethers.utils.parseEther("1000000");
    
-    // Deploy ERC20 contract
+    // Deploy student contract
     const contractFactory = await ethers.getContractFactory(contractPath, signer);
-    const amount = ethers.utils.parseEther("1");
-    const contractInstance = await contractFactory.deploy({value: amount});
+    const contractInstance = await contractFactory.deploy(name, symbol, maxSupply);
 
-
-    console.log("-- Contract Address:\t", contractInstance.address);
+    /// --------------------------------------------------------------------------------------------------
+    console.log("-- Contract Address:", contractInstance.address);
     console.log("---------------------------------------------------------------------------------------");
     console.log("-- Contracts have been successfully deployed");
     console.log("---------------------------------------------------------------------------------------");
