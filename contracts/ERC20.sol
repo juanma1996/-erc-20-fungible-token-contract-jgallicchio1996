@@ -37,7 +37,12 @@ contract ERC20 {
      * @param _maxSupply The maximum supply of the token. Zero for unlimited emition
      */
     constructor(string memory _name, string memory _symbol, uint256 _maxSupply) {
-        // TODO: Implement method
+        string memory _methodName = 'constructor';
+        _isEmptyString(_name, _methodName, '_name');
+        _isEmptyString(_symbol, _methodName, '_symbol');
+        name = _name;
+        symbol = _symbol;
+        maxSupply = _maxSupply;
         decimals = 18; // Same as ether
     }
 
@@ -46,13 +51,21 @@ contract ERC20 {
     /**
      * @notice Transfers `_value` amount of tokens to address `_to`. On success must fire the `Transfer` event.
      * @dev Throw if `_to` is zero address. Message: "transfer - Invalid parameter: _to"
+     * @dev Throw if `_to` is sender account. Message: "transfer - Invalid recipient, same as remittent"
      * @dev Throw if `_value` is zero. Message: "transfer - Invalid parameter: _value"
      * @dev Throw if remittent account has insufficient balance. Message: "transfer - Insufficient balance"
      * @param _to It is the recipient account address
      * @param _value It is the amount of tokens to transfer.
      */
     function transfer(address _to, uint256 _value) external {
-        // TODO: Implement method
+        string memory _methodName = 'transfer';
+        _isZeroAddress(_to, _methodName, '_to');
+        _isValidRecipient(msg.sender, _to, _methodName);
+        _isZeroAmount(_value, _methodName, '_value');
+        _hasSufficientBalance(msg.sender, _value, _methodName);
+        balanceOf[msg.sender] -= _value;
+        balanceOf[_to] += _value;
+        emit Transfer(msg.sender, _to, _value);
     }
 
     /**
@@ -60,6 +73,7 @@ contract ERC20 {
      * On success must fire the `Transfer` event.
      * @dev Throw if `_from` is zero address. Message: "transferFrom - Invalid parameter: _from"
      * @dev Throw if `_to` is zero address. Message: "transferFrom - Invalid parameter: _to"
+     * @dev Throw if `_to` is the same as `_from` account. Message: "transferFrom - Invalid recipient, same as remittent"
      * @dev Throw if `_value` is zero. Message: "transferFrom - Invalid parameter: _value"
      * @dev Throw if `_from` account has insufficient balance. Message: "transferFrom - Insufficient balance"
      * @dev Throws if `msg.sender` is not the current owner or an approved address with permission to spend the balance of the '_from' account
@@ -69,7 +83,16 @@ contract ERC20 {
      * @param _value It is the amount of tokens to transfer.
      */
     function transferFrom(address _from, address _to, uint256 _value) external {
-        // TODO: Implement method
+        string memory _methodName = 'transferFrom';
+        _isZeroAddress(_from, _methodName, '_from');
+        _isZeroAddress(_to, _methodName, '_to');
+        _isValidRecipient(_from, _to, _methodName);
+        _isZeroAmount(_value, _methodName, '_value');
+        _hasSufficientBalance(_from, _value, _methodName);
+        _isAuthorized(_from, msg.sender, _value, _methodName);
+        balanceOf[_from] -= _value;
+        balanceOf[_to] += _value;
+        emit Transfer(_from, _to, _value);
     }
 
     /**
@@ -85,7 +108,15 @@ contract ERC20 {
      * @param _value It is the allowance amount.
      */
     function approve(address _spender, uint256 _value) external {
-        // TODO: Implement method
+        string memory _methodName = 'approve';
+        uint256 currentAllowance = allowance[msg.sender][_spender];
+        if(_value > 0 && currentAllowance > 0) {
+            revert(_concatMessage(_methodName, " - Invalid allowance amount. Set to zero first", ""));
+        }
+        _isZeroAddress(_spender, _methodName, '_spender');
+        _hasSufficientBalance(msg.sender, _value, _methodName);
+        allowance[msg.sender][_spender] = _value;
+        emit Approval(msg.sender, _spender, _value);
     }
 
     /**
@@ -95,8 +126,14 @@ contract ERC20 {
      * @dev Throw if total supply overcame the maximum supply. Message: "mint - Total supply exceeds maximum supply"
      * @param _recipient It is the recipient account for the new tokens
      */
-    function mint(address _recipient) external {
-        // TODO: Implement method
+    function mint(address _recipient) external payable {
+        string memory _methodName = 'mint';
+        _isZeroValue(_methodName);
+        _isZeroAddress(_recipient, _methodName, '_recipient');
+        _isMaxSupply(_methodName);
+        balanceOf[_recipient] += msg.value;
+        totalSupply += msg.value;
+        emit Transfer(address(0), _recipient, msg.value);
     }
 
     /**
@@ -110,6 +147,74 @@ contract ERC20 {
      * @param _value It is the number of new tokens to be burned
      */
     function burn(address _from, uint256 _value) external {
-        // TODO: Implement method
+        string memory _methodName = 'burn';
+        _isZeroAddress(_from, _methodName, '_from');
+        _isZeroAmount(_value, _methodName, '_value');
+        _hasSufficientBalance(_from, _value, _methodName);
+        _isAuthorized(_from, msg.sender, _value, _methodName);
+        balanceOf[_from] -= _value;
+        totalSupply -= _value;
+        emit Burn(_from, msg.sender, _value);
+        payable(_from).transfer(_value);
+    }
+
+    function _concatMessage(string memory _methodName, string memory _message, string memory _parameterName) private pure returns(string memory) {
+        return string.concat(_methodName, _message, _parameterName);
+    }
+
+    function _isEmptyString(string memory _value, string memory _methodName, string memory _parameterName) private pure {
+        if (bytes(_value).length == 0) {
+            string memory _message = _concatMessage(_methodName, " - Invalid parameter: ", _parameterName);
+            revert(_message);
+        }
+    }
+
+    function _isZeroAddress(address _address, string memory _methodName, string memory _parameterName) private pure {
+        if (_address == address(0)) {
+            string memory _message = _concatMessage(_methodName, " - Invalid parameter: ", _parameterName);
+            revert(_message);
+        }
+    }
+
+    function _isZeroAmount(uint256 _value, string memory _methodName, string memory _parameterName) private pure {
+        if (_value == 0) {
+            string memory _message = _concatMessage(_methodName, " - Invalid parameter: ", _parameterName);
+            revert(_message);
+        }
+    }
+
+    function _hasSufficientBalance(address _address, uint256 _value, string memory _methodName) private view {
+        if (balanceOf[_address] < _value) {
+            string memory _message = _concatMessage(_methodName, " - Insufficient balance", "");
+            revert(_message);
+        }
+    }
+
+    function _isAuthorized(address _owner, address _spender, uint256 _value, string memory _methodName) private view {
+        if (_owner != _spender && allowance[_owner][_spender] < _value) {
+            string memory _message = _concatMessage(_methodName, " - Insufficent allowance", "");
+            revert(_message);
+        }
+    }
+
+    function _isValidRecipient(address _remittent, address _recipient, string memory _methodName) private pure {
+        if (_recipient == _remittent) {
+            string memory _message = _concatMessage(_methodName, " - Invalid recipient, same as remittent", "");
+            revert(_message);
+        }
+    }
+
+    function _isZeroValue(string memory _methodName) private {
+        if(msg.value == 0) {
+            string memory _message = _concatMessage(_methodName, " - Invalid ether amount", "");
+            revert(_message);
+        }
+    }
+
+    function _isMaxSupply(string memory _methodName) private view {
+        if (totalSupply + msg.value > maxSupply) {
+            string memory _message = _concatMessage(_methodName, " - Total supply exceeds maximum supply", "");
+            revert(_message);
+        }
     }
 }

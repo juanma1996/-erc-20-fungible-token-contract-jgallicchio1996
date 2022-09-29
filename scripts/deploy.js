@@ -2,7 +2,7 @@ const { ethers } = require("hardhat");
 
 // Contract to deploy
 const CONTRACT_NAME = "ERC20";
-let contractInstance;
+const contractPath = "contracts/ERC20.sol:ERC20";
 
 async function main() {
 
@@ -10,9 +10,13 @@ async function main() {
     console.log("-- Deploy contracts process start...");
     console.log("---------------------------------------------------------------------------------------");
 
-    /// --------------------------------------------------------------------------------------------------
-    /// ToDo: Place your deploy code here
-    /// --------------------------------------------------------------------------------------------------
+    // Get Signer
+    const [signer] = await ethers.getSigners();
+   
+    // Deploy ERC20 contract
+    const contractFactory = await ethers.getContractFactory(contractPath, signer);
+    const amount = ethers.utils.parseEther("1");
+    const contractInstance = await contractFactory.deploy({value: amount});
 
 
     console.log("-- Contract Address:\t", contractInstance.address);
